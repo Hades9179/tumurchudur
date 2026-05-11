@@ -1,242 +1,193 @@
-// ===== АДМИН ПАНЕЛ ФУНКЦҮҮД =====
-let adminUsers = [];
-let adminStories = [];
-let adminTests = [];
+// Admin JS — Хэрэглэгч, Түүх удирдлага (Local-only режим)
+// Энэ файл нь admin.html-д хэрэглэгдэнэ. Түүхийг localStorage-д хадгалж, зураг болон мэдээллийг base64 хэлбэрээр хадгална.
 
-// Админ өгөгдлийг ачаалах
-function initializeAdmin() {
-    adminUsers = JSON.parse(localStorage.getItem('users')) || [];
-    adminStories = JSON.parse(localStorage.getItem('stories')) || [];
-    adminTests = JSON.parse(localStorage.getItem('tests')) || [];
-    
-    loadUsersTable();
-    loadStoriesTable();
-    loadTestsTable();
-    loadStatsTable();
+// ===== ХЭРЭГЛЭГЧ МЕНЕЖМЕНТ =====
+function loadUsers() {
+    const raw = localStorage.getItem('users');
+    return raw ? JSON.parse(raw) : [];
 }
 
-// ===== ХЭРЭГЛЭГЧ УДИРДЛАГА =====
-function loadUsersTable() {
-    const tbody = document.getElementById('usersTableBody');
-    tbody.innerHTML = '';
-
-    adminUsers.forEach((user, index) => {
-        const row = `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${user.username}</td>
-                <td>${user.age}</td>
-                <td>${user.storiesRead ? user.storiesRead.length : 0}</td>
-                <td>${user.createdAt ? new Date(user.createdAt).toLocaleDateString('mn-MN') : '-'}</td>
-                <td>
-                    <button class="btn btn-secondary" onclick="deleteUser(${user.id})">Устгах</button>
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
+function saveUsers(users) {
+    localStorage.setItem('users', JSON.stringify(users));
 }
 
 function createNewUser() {
-    const username = document.getElementById('newUsername').value;
-    const age = document.getElementById('newAge').value;
+    const username = document.getElementById('newUsername').value.trim();
+    const age = parseInt(document.getElementById('newAge').value, 10);
     const password = document.getElementById('newPassword').value;
 
     if (!username || !age || !password) {
-        alert('❌ Бүх талбарыг бөглөнө үү!');
+        alert('Бүх талбарыг бөглөнө үү');
         return;
     }
 
-    if (adminUsers.find(u => u.username === username)) {
-        alert('❌ Энэ хэрэглэгчийн нэр аль хэдийн бүртгүүлсэн!');
+    const users = loadUsers();
+    if (users.find(u => u.username === username)) {
+        alert('Энэ нэр аль хэдийнэ ашиглагдсан байна');
         return;
     }
 
-    const newUser = {
-        id: Date.now(),
-        username: username,
-        age: age,
-        password: password,
-        storiesRead: [],
-        testsScores: [],
-        createdAt: new Date().toISOString()
-    };
-
-    adminUsers.push(newUser);
-    localStorage.setItem('users', JSON.stringify(adminUsers));
-
+    const user = { id: Date.now(), username, age, password, createdAt: new Date().toISOString(), points: 0 };
+    users.push(user);
+    saveUsers(users);
     document.getElementById('newUsername').value = '';
     document.getElementById('newAge').value = '';
     document.getElementById('newPassword').value = '';
+    loadUsersTable();
+    alert('Хэрэглэгч амжилттай үүслээ');
+}
 
-    alert('✅ Шинэ хэрэглэгч амжилттай үүсгэлээ!');
+function loadUsersTable() {
+    const users = loadUsers();
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    users.forEach((u, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${u.username}</td>
+            <td>${u.age || ''}</td>
+            <td>${u.createdAt ? new Date(u.createdAt).toLocaleString() : ''}</td>
+            <td>${u.points || 0}</td>
+            <td><button class="btn" onclick="removeUser(${u.id})">Устгах</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function removeUser(userId) {
+    if (!confirm('Энэ хэрэглэгчийг устгахдаа итгэлтэй байна уу?')) return;
+    let users = loadUsers();
+    users = users.filter(u => u.id !== userId);
+    saveUsers(users);
     loadUsersTable();
 }
 
-function deleteUser(userId) {
-    if (confirm('❓ Энэ хэрэглэгчийг устгах уу?')) {
-        adminUsers = adminUsers.filter(u => u.id !== userId);
-        localStorage.setItem('users', JSON.stringify(adminUsers));
-        alert('✅ Хэрэглэгч устгагдлаа!');
-        loadUsersTable();
-    }
+// ===== ТҮҮХ МЕНЕЖМЕНТ (LocalStorage дээр) =====
+function loadStoredStories() {
+    const raw = localStorage.getItem('customStories');
+    return raw ? JSON.parse(raw) : [];
 }
 
-// ===== ТҮҮХҮҮД УДИРДЛАГА =====
-function loadStoriesTable() {
-    const tbody = document.getElementById('storiesTableBody');
-    tbody.innerHTML = '';
+function saveStoredStories(list) {
+    localStorage.setItem('customStories', JSON.stringify(list));
+}
 
-    adminStories.forEach((story, index) => {
-        const row = `
-            <tr>
-                <td>${story.title}</td>
-                <td>${story.content.length} үг</td>
-                <td>
-                    <button class="btn btn-secondary" onclick="deleteStory(${story.id})">Устгах</button>
-                </td>
-            </tr>
+function loadStoriesTable() {
+    const table = document.getElementById('storiesTableBody');
+    if (!table) return;
+    const stored = loadStoredStories();
+    table.innerHTML = '';
+    stored.forEach((s, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${escapeHtml(s.title)}</td>
+            <td>${(s.text || '').substring(0, 80).replace(/\n/g, ' ')}...</td>
+            <td>${s.image ? '<span>📷</span>' : ''}</td>
+            <td><button class="btn" onclick="deleteStoredStory('${s.id}')">Устгах</button></td>
         `;
-        tbody.innerHTML += row;
+        table.appendChild(tr);
     });
 }
 
-function addNewStory() {
-    const title = document.getElementById('storyTitle').value;
-    const emoji = document.getElementById('storyEmoji').value;
-    const content = document.getElementById('storyContent').value;
+function deleteStoredStory(id) {
+    if (!confirm('Энэ түүхийг устгахдаа итгэлтэй байна уу?')) return;
+    let list = loadStoredStories();
+    list = list.filter(s => s.id !== id);
+    saveStoredStories(list);
+    loadStoriesTable();
+    if (window.renderStoriesList) window.renderStoriesList();
+}
 
-    if (!title || !emoji || !content) {
-        alert('❌ Бүх талбарыг бөглөнө үү!');
+// ===== TLS (File -> Base64) функц =====
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+    });
+}
+
+async function addNewStoryFromAdmin() {
+    const title = document.getElementById('storyTitleInput').value.trim();
+    const text = document.getElementById('storyTextInput').value.trim();
+    const imageFile = document.getElementById('storyImageInput').files[0];
+
+    if (!title || !text) {
+        alert('Түүхийн гарчиг болон текст заавал шаардлагатай');
         return;
+    }
+
+    let imageData = null;
+    if (imageFile) {
+        // size check: 1.5MB max
+        const maxBytes = 1.5 * 1024 * 1024;
+        if (imageFile.size > maxBytes) {
+            alert('Зураг ихтэй байна (хамгийн их 1.5MB).');
+            return;
+        }
+        try {
+            imageData = await fileToDataUrl(imageFile);
+        } catch (e) {
+            console.error(e);
+            alert('Зургыг уншиж чадсангүй');
+            return;
+        }
     }
 
     const newStory = {
-        id: Date.now(),
-        title: emoji + ' ' + title,
-        description: title,
-        content: content
+        id: 'cs_' + Date.now(),
+        title,
+        text,
+        image: imageData,
+        createdAt: new Date().toISOString()
     };
 
-    adminStories.push(newStory);
-    localStorage.setItem('stories', JSON.stringify(adminStories));
+    const list = loadStoredStories();
+    list.unshift(newStory);
+    saveStoredStories(list);
 
-    document.getElementById('storyTitle').value = '';
-    document.getElementById('storyEmoji').value = '';
-    document.getElementById('storyContent').value = '';
+    // цэвэрлэх
+    document.getElementById('storyTitleInput').value = '';
+    document.getElementById('storyTextInput').value = '';
+    document.getElementById('storyImageInput').value = '';
 
-    alert('✅ Шинэ түүх нэмэгдлээ!');
     loadStoriesTable();
+    if (window.renderStoriesList) window.renderStoriesList();
+    alert('Түүх амжилттай нэмэгдлээ');
 }
 
-function deleteStory(storyId) {
-    if (confirm('❓ Энэ түүхийг устгах уу?')) {
-        adminStories = adminStories.filter(s => s.id !== storyId);
-        localStorage.setItem('stories', JSON.stringify(adminStories));
-        alert('✅ Түүх устгагдлаа!');
-        loadStoriesTable();
-    }
-}
-
-// ===== СОРИЛТ УДИРДЛАГА =====
-function loadTestsTable() {
-    const tbody = document.getElementById('testsTableBody');
-    tbody.innerHTML = '';
-
-    adminTests.forEach((test, index) => {
-        const storyName = getStoryName(test.story);
-        const row = `
-            <tr>
-                <td>${test.title}</td>
-                <td>${storyName}</td>
-                <td>${test.question}</td>
-                <td>
-                    <button class="btn btn-secondary" onclick="deleteTest(${test.id})">Устгах</button>
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
-}
-
-function getStoryName(storyId) {
-    const story = adminStories.find(s => s.id === parseInt(storyId));
-    return story ? story.title : 'Үл мэдэгдэх';
-}
-
-function addNewTest() {
-    const title = document.getElementById('testTitle').value;
-    const story = document.getElementById('testStory').value;
-    const question = document.getElementById('testQuestion').value;
-    const answer = document.getElementById('testAnswer').value;
-
-    if (!title || !story || !question || !answer) {
-        alert('❌ Бүх талбарыг бөглөнө үү!');
-        return;
-    }
-
-    const newTest = {
-        id: Date.now(),
-        title: title,
-        story: story,
-        question: question,
-        answer: answer
-    };
-
-    adminTests.push(newTest);
-    localStorage.setItem('tests', JSON.stringify(adminTests));
-
-    document.getElementById('testTitle').value = '';
-    document.getElementById('testStory').value = '';
-    document.getElementById('testQuestion').value = '';
-    document.getElementById('testAnswer').value = '';
-
-    alert('✅ Шинэ сорилт нэмэгдлээ!');
-    loadTestsTable();
-}
-
-function deleteTest(testId) {
-    if (confirm('❓ Энэ сорилтыг устгах уу?')) {
-        adminTests = adminTests.filter(t => t.id !== testId);
-        localStorage.setItem('tests', JSON.stringify(adminTests));
-        alert('✅ Сорилт устгагдлаа!');
-        loadTestsTable();
-    }
-}
-
-// ===== СТАТИСТИК =====
-function loadStatsTable() {
-    const tbody = document.getElementById('statsTableBody');
-    tbody.innerHTML = '';
-
-    adminUsers.forEach((user) => {
-        if (user.username === 'admin') return; // Админ хүүхэлд орохгүй
-
-        const totalStories = user.storiesRead ? user.storiesRead.length : 0;
-        const testScores = user.testsScores ? user.testsScores.reduce((sum, t) => sum + t.score, 0) : 0;
-
-        const row = `
-            <tr>
-                <td>${user.username}</td>
-                <td>${totalStories}</td>
-                <td>${totalStories * 10}</td>
-                <td>${testScores}</td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
-}
-
-// ===== АДМИН ТАБ СОЛИХ =====
+// ===== UI Tab шилжүүлэх =====
 function switchAdminTab(tab) {
     document.querySelectorAll('.admin-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
-    
-    document.getElementById(tab + 'Content').classList.add('active');
-    event.target.classList.add('active');
+    const btn = document.querySelector(`.admin-tab-btn[onclick="switchAdminTab('${tab}')"]`);
+    if (btn) btn.classList.add('active');
+    const content = document.getElementById(tab + 'Content');
+    if (content) content.classList.add('active');
 }
 
-// Хуудас ачаалах үед функцийг дуудах
+// ===== Бутэнэ эхлүүлэх =====
 document.addEventListener('DOMContentLoaded', () => {
-    initializeAdmin();
+    // users table
+    loadUsersTable();
+    // stories table
+    loadStoriesTable();
+
+    // hook admin buttons if present
+    const createUserBtn = document.querySelector('#usersContent .btn-primary');
+    if (createUserBtn) createUserBtn.addEventListener('click', createNewUser);
+
+    const addStoryBtn = document.getElementById('addStoryBtn');
+    if (addStoryBtn) addStoryBtn.addEventListener('click', addNewStoryFromAdmin);
 });
+
+// ===== Туслах функцууд =====
+function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, function (c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+}

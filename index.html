@@ -13,6 +13,11 @@
             <div class="nav-content">
                 <h1 class="logo">📚 Түмэрчүүдүр</h1>
                 <div class="nav-links">
+                    <div class="points-badge" id="pointsBadge" style="display:none;">🔵 0</div>
+                    <select id="langSelect" class="nav-btn" style="padding:6px 10px; border-radius:12px;">
+                        <option value="mn">MN</option>
+                        <option value="en">EN</option>
+                    </select>
                     <button id="logoutBtn" class="nav-btn" style="display:none;">Гарах</button>
                     <a href="admin.html" class="nav-btn admin-link" id="adminLink" style="display:none;">⚙️ Админ</a>
                 </div>
@@ -75,23 +80,8 @@
                 <p id="userName" class="user-info"></p>
             </div>
 
-            <div class="stories-list">
-                <div class="story-card" onclick="selectStory(1)">
-                    <h3>🐺 Ноён Чоно</h3>
-                    <p>Зэврэг нь агнаж явдаг түүх</p>
-                </div>
-                <div class="story-card" onclick="selectStory(2)">
-                    <h3>🐢 Аварга Яст</h3>
-                    <p>Цаг хугацааны ухаалаг түүх</p>
-                </div>
-                <div class="story-card" onclick="selectStory(3)">
-                    <h3>🌙 Сарны Үлгэр</h3>
-                    <p>Шөнийн сонирхолтой үлгэр</p>
-                </div>
-                <div class="story-card" onclick="selectStory(4)">
-                    <h3>⭐ Одны Түүх</h3>
-                    <p>Небийн баяр баясгалан</p>
-                </div>
+            <div class="stories-list" id="storiesList">
+                <!-- Story cards loaded from JS -->
             </div>
 
             <div id="storyContent" class="story-content" style="display:none;">
@@ -106,8 +96,17 @@
                     <!-- Текст энд байх болно -->
                 </div>
 
+                <div id="storyImageWrap" style="text-align:center; margin:15px 0; display:none;">
+                    <img id="storyImage" src="" alt="Story Image" style="max-width:100%; border-radius:8px;" />
+                </div>
+
                 <canvas id="cursorCanvas" class="cursor-canvas"></canvas>
                 <audio id="audioPlayer"></audio>
+
+                <div class="leaderboard" id="leaderboard">
+                    <h3>🏆 Leaderboard</h3>
+                    <ul id="leaderboardList"></ul>
+                </div>
             </div>
         </div>
     </div>
